@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>New Year Countdown</title>
+<style>
+  :root {
+    --font:'Inter', sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    height:100vh;
+    width:100vw;
+    font-family:var(--font);
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    color:white;
+    background:linear-gradient(-45deg, #0a0f1a, #141b29, #0d1524, #121826);
+    background-size:400% 400%;
+    animation:gradientShift 12s ease infinite;
+  }
+  @keyframes gradientShift{
+    0%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+    100%{background-position:0% 50%}
+  }
+
+  .logo-box{
+    position:absolute;
+    top:40px;
+    width:100%;
+    text-align:center;
+    z-index:10;
+  }
+  .logo-box img{
+    width:110px;
+    height:110px;
+    object-fit:contain;
+    filter:drop-shadow(0 0 12px rgba(255,255,255,0.3));
+    border-radius: 30px;
+  }
+  .logo-title{
+    margin-top:10px;
+    font-size:28px;
+    font-weight:800;
+    letter-spacing:1.5px;
+  }
+
+  .timer{
+    position:relative;
+    text-align:center;
+    z-index:5;
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+  }
+  h1{
+    font-size:46px;
+    font-weight:900;
+    letter-spacing:1px;
+  }
+  .grid{
+    display:flex;
+    gap:20px;
+    justify-content:center;
+  }
+  .unit{
+    padding:20px 26px;
+    background:rgba(255,255,255,0.06);
+    border-radius:20px;
+    backdrop-filter:blur(10px);
+    min-width:130px;
+  }
+  .num{font-size:46px;font-weight:800}
+  .label{margin-top:6px;font-size:14px;color:#9fb0c8}
+
+  #snowCanvas{position:absolute;inset:0;z-index:2;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div class="logo-box">
+  <img src="logo.jpg" alt="logo" />
+  <div class="logo-title">Fox Tooxed</div>
+</div>
+
+<canvas id="snowCanvas"></canvas>
+
+<div class="timer">
+  <h1>До Нового Года осталось</h1>
+  <div class="grid">
+    <div class="unit"><div class="num" id="days">00</div><div class="label">Дней</div></div>
+    <div class="unit"><div class="num" id="hours">00</div><div class="label">Часов</div></div>
+    <div class="unit"><div class="num" id="minutes">00</div><div class="label">Минут</div></div>
+    <div class="unit"><div class="num" id="seconds">00</div><div class="label">Секунд</div></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/three@0.154.0/build/three.min.js"></script>
+<script>
+function updateCountdown(){
+  const now=new Date();
+  const ny=new Date(`January 1, ${now.getFullYear()+1} 00:00:00`);
+  const diff=ny-now;
+  days.textContent=Math.floor(diff/86400000);
+  hours.textContent=String(Math.floor(diff/3600000)%24).padStart(2,'0');
+  minutes.textContent=String(Math.floor(diff/60000)%60).padStart(2,'0');
+  seconds.textContent=String(Math.floor(diff/1000)%60).padStart(2,'0');
+}
+setInterval(updateCountdown,1000);updateCountdown();
+
+const canvas=document.getElementById('snowCanvas');
+const renderer=new THREE.WebGLRenderer({canvas,alpha:true});
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,2000);
+camera.position.z=400;
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+
+const loader=new THREE.TextureLoader();
+loader.load('./snow.png', texture => {
+  const count = 700;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count*3);
+  const sizeArr = new Float32Array(count);
+  const speedArr = new Float32Array(count);
+
+  for(let i=0;i<count;i++){
+    pos[i*3] = (Math.random()-0.5)*900;
+    pos[i*3+1] = Math.random()*900;
+    pos[i*3+2] = (Math.random()-0.5)*800;
+    sizeArr[i] = 10 + Math.random()*14;
+    speedArr[i] = 0.1 + Math.random()*0.4;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizeArr, 1));
+  geo.setAttribute('speed', new THREE.BufferAttribute(speedArr, 1));
+
+  const mat = new THREE.PointsMaterial({
+    size: 12,
+    map: texture,
+    transparent: true,
+    opacity: 0.4,
+    depthWrite: false
+  });
+
+  const snow = new THREE.Points(geo, mat);
+  scene.add(snow);
+
+  let targetParX=0, targetParY=0;
+  let camX=0, camY=0;
+
+  window.addEventListener('mousemove', e => {
+    targetParX = (e.clientX / window.innerWidth - 0.1) * 100;
+    targetParY = (e.clientY / window.innerHeight - 0.5) * 0;
+  });
+
+  function animate(){
+    camX += (targetParX - camX) * 0.05;
+    camY += (targetParY - camY) * 0.05;
+
+    camera.position.x = camX * 0.3;
+    camera.position.y = -camY * 0.3;
+    camera.lookAt(0,0,0);
+
+    const p = geo.attributes.position.array;
+    const sp = geo.attributes.speed.array;
+
+    for(let i=0;i<count;i++){
+      p[i*3+1] -= sp[i];
+      p[i*3] += Math.sin(Date.now()*0.001 + i)*0.02;
+      if(p[i*3+1] < -200){
+        p[i*3+1] = 900;
+        p[i*3] = (Math.random()-0.5)*900;
+      }
+    }
+
+    geo.attributes.position.needsUpdate = true;
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+});
+
+let tX=0, tY=0;
+let cX=0, cY=0;
+
+window.addEventListener('mousemove', e => {
+  tX = (e.clientX/window.innerWidth - 0.5) * 100;
+  tY = (e.clientY/window.innerHeight - 0.5) * 100;
+});
+
+function smoothParallax(){
+  cX += (tX - cX) * 0.07;
+  cY += (tY - cY) * 0.07;
+
+  document.querySelector('.timer').style.transform =
+    `translate(${cX}px, ${cY}px)`;
+
+  document.querySelector('.logo-box').style.transform =
+    `translate(${cX*0.5}px, ${cY*0.5}px)`;
+
+  requestAnimationFrame(smoothParallax);
+}
+smoothParallax();
+
+window.addEventListener('resize',()=>{
+  renderer.setSize(innerWidth,innerHeight);
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+});
+</script>
+</body>
+</html>
